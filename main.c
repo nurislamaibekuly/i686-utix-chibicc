@@ -568,7 +568,7 @@ static void cc1(void) {
 }
 
 static void assemble(char *input, char *output) {
-  char *cmd[] = {"as", "-c", input, "-o", output, NULL};
+  char *cmd[] = {"i686-elf-as", "-c", input, "-o", output, NULL};
   run_subprocess(cmd);
 }
 
@@ -613,70 +613,36 @@ static char *find_gcc_libpath(void) {
 }
 
 static void run_linker(StringArray *inputs, char *output) {
-  StringArray arr = {};
+    // made my own linker script bc, what do you mean 4 kb just for a program return 1
+    const char *linkerscript =
+        "OUTPUT_FORMAT(\"binary\")\n"
+        "SECTIONS {\n"
+        "    . = 0x100000;\n"
+        "    .text : { *(.text) }\n"
+        "    .rodata : { *(.rodata) }\n"
+        "    .data : { *(.data) }\n"
+        "    .bss : { *(.bss) }\n"
+        "}\n";
 
-  strarray_push(&arr, "ld");
-  strarray_push(&arr, "-o");
-  strarray_push(&arr, output);
-  strarray_push(&arr, "-m");
-  strarray_push(&arr, "elf_x86_64");
+    char *ld = create_tmpfile();
+    FILE *f = fopen(ld, "w");
+    fwrite(linkerscript, 1, strlen(linkerscript), f);
+    fclose(f);
 
-  char *libpath = find_libpath();
-  char *gcc_libpath = find_gcc_libpath();
+    StringArray arr = {};
+    strarray_push(&arr, "i686-elf-ld");
+    strarray_push(&arr, "-T");
+    strarray_push(&arr, ld);
+    strarray_push(&arr, "-o");
+    strarray_push(&arr, output);
 
-  if (opt_shared) {
-    strarray_push(&arr, format("%s/crti.o", libpath));
-    strarray_push(&arr, format("%s/crtbeginS.o", gcc_libpath));
-  } else {
-    strarray_push(&arr, format("%s/crt1.o", libpath));
-    strarray_push(&arr, format("%s/crti.o", libpath));
-    strarray_push(&arr, format("%s/crtbegin.o", gcc_libpath));
-  }
+    strarray_push(&arr, "lib/libc.o");
 
-  strarray_push(&arr, format("-L%s", gcc_libpath));
-  strarray_push(&arr, "-L/usr/lib/x86_64-linux-gnu");
-  strarray_push(&arr, "-L/usr/lib64");
-  strarray_push(&arr, "-L/lib64");
-  strarray_push(&arr, "-L/usr/lib/x86_64-linux-gnu");
-  strarray_push(&arr, "-L/usr/lib/x86_64-pc-linux-gnu");
-  strarray_push(&arr, "-L/usr/lib/x86_64-redhat-linux");
-  strarray_push(&arr, "-L/usr/lib");
-  strarray_push(&arr, "-L/lib");
+    for (int i = 0; i < inputs->len; i++)
+        strarray_push(&arr, inputs->data[i]);
 
-  if (!opt_static) {
-    strarray_push(&arr, "-dynamic-linker");
-    strarray_push(&arr, "/lib64/ld-linux-x86-64.so.2");
-  }
-
-  for (int i = 0; i < ld_extra_args.len; i++)
-    strarray_push(&arr, ld_extra_args.data[i]);
-
-  for (int i = 0; i < inputs->len; i++)
-    strarray_push(&arr, inputs->data[i]);
-
-  if (opt_static) {
-    strarray_push(&arr, "--start-group");
-    strarray_push(&arr, "-lgcc");
-    strarray_push(&arr, "-lgcc_eh");
-    strarray_push(&arr, "-lc");
-    strarray_push(&arr, "--end-group");
-  } else {
-    strarray_push(&arr, "-lc");
-    strarray_push(&arr, "-lgcc");
-    strarray_push(&arr, "--as-needed");
-    strarray_push(&arr, "-lgcc_s");
-    strarray_push(&arr, "--no-as-needed");
-  }
-
-  if (opt_shared)
-    strarray_push(&arr, format("%s/crtendS.o", gcc_libpath));
-  else
-    strarray_push(&arr, format("%s/crtend.o", gcc_libpath));
-
-  strarray_push(&arr, format("%s/crtn.o", libpath));
-  strarray_push(&arr, NULL);
-
-  run_subprocess(arr.data);
+    strarray_push(&arr, NULL);
+    run_subprocess(arr.data);
 }
 
 static FileType get_file_type(char *filename) {

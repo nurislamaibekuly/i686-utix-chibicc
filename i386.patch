@@ -1,0 +1,80 @@
+diff --git a/codegen.c b/codegen.c
+index 1c9a0f3..i386 100644
+--- a/codegen.c
++++ b/codegen.c
+@@ -175,7 +175,6 @@ static void cast(Type *from, Type *to) {
+   if (to->kind == TY_VOID)
+     return;
+
+-  char *insn = ty->is_unsigned ? "movz" : "movs";
+   switch (get_type_id(from)) {
+   case I8:
+     println("  movsbl %%al, %%eax");
+@@ -335,8 +334,12 @@ static void emit_data(Obj *prog) {
+       if (var->init)
+         emit_data_init(var->ty, var->init, var->name);
+       else
+-        println("  .quad 0");
++        println("  .long 0\n  .long 0");
+       continue;
+     }
+@@ -600,6 +603,8 @@ static void gen_expr(Node *node) {
+   switch (node->kind) {
+
+   case ND_LABEL_VAL:
+-    println("  lea %s(%%rip), %%rax", node->unique_label);
++    // i386 has no RIP-relative addressing
++    println("  mov $%s, %%eax", node->unique_label);
+     return;
+
+   case ND_FUNCALL: {
+@@ -645,8 +650,8 @@ static void gen_expr(Node *node) {
+       gen_expr(node->args[i]);
+       println("  push %%eax");
+       depth++;
+-      stack_args++;
++      stack_args++;
+     }
+
+     gen_expr(node->lhs);
+@@ -654,21 +659,12 @@ static void gen_expr(Node *node) {
+     println("  call *%%eax");
+
+-    println("  add $%d, %%rsp", stack_args * 8);
++    println("  add $%d, %%esp", stack_args * 4);
+     depth -= stack_args;
+     return;
+   }
+
+-  // ❌ DEAD x86-64 CODE — REMOVE
+-  println("  mov %%rax, %%r10");
+-  println("  mov $%d, %%rax", fp);
+-  println("  call *%%r10");
+-  println("  add $%d, %%rsp", stack_args * 8);
+-  depth -= stack_args;
+
+   case ND_CAS:
+   case ND_EXCH: {
+@@ -676,14 +672,14 @@ static void gen_expr(Node *node) {
+     gen_expr(node->rhs);
+     push();
+     gen_expr(node->lhs);
+-    pop("%rdx");
++    pop("%edx");
+
+-    println("  mov %%rax, %%r8");
+-    println("  lock cmpxchg %%rdx, (%%rdi)");
++    println("  mov %%eax, %%ecx");
++    println("  lock cmpxchg %%edx, (%%edi)");
+
+     println("  sete %%al");
+     println("  movzbl %%al, %%eax");
+@@ -706,7 +702,7 @@ static void gen_expr(Node *node) {
+   case ND_SHL:
+   case ND_SHR:
+     gen_expr(node->rhs);
+-    println("  mov %%rdi, %%rcx");
++    println("  mov %%edi, %%ecx");
+     gen_expr(node->lhs);
+     println("  shl %%cl, %%eax");
+     return;
