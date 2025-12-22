@@ -408,7 +408,7 @@ void add_type(Node *node);
 // codegen.c
 //
 
-void codegen(Obj *prog, FILE *out);
+void codegen(Obj *prog, FILE *out, bool library);
 int align_to(int n, int align);
 
 //

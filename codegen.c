@@ -76,18 +76,18 @@ static char *reg_dx(int sz) {
 static void gen_addr(Node *node) {
   switch (node->kind) {
   case ND_VAR:
-    if (node->var->ty->kind == TY_VLA) {
-      println("  mov %d(%%ebp), %%eax", node->var->offset);
-      return;
-    }
+      if (node->var->ty->kind == TY_VLA) {
+        println("  mov %d(%%ebp), %%eax", node->var->offset);
+        return;
+      }
 
-    if (node->var->is_local) {
-      println("  lea %d(%%ebp), %%eax", node->var->offset);
-      return;
-    }
+      if (node->var->is_local) {
+        println("  lea %d(%%ebp), %%eax", node->var->offset);  // Always use lea here
+        return;
+      }
 
-    println("  lea %s, %%eax", node->var->name);
-    return;
+      println("  lea %s, %%eax", node->var->name);
+      return;
   case ND_DEREF:
     gen_expr(node->lhs);
     return;
@@ -160,22 +160,22 @@ static void store(Type *ty) {
       println("  mov %%cl, %d(%%edi)", i);
     }
     return;
-    case TY_FLOAT:
-        println("  movss %%xmm0, (%%edi)");
-        return;
-      case TY_DOUBLE:
-        println("  movsd %%xmm0, (%%edi)");
-        return;
-      case TY_LDOUBLE:
-        println("  fstpt (%%edi)");
-        return;
+  case TY_FLOAT:
+    println("  movss %%xmm0, (%%edi)");
+    return;
+  case TY_DOUBLE:
+    println("  movsd %%xmm0, (%%edi)");
+    return;
+  case TY_LDOUBLE:
+    println("  fstpt (%%edi)");
+    return;
   }
-  // char *insn = ty->is_unsigned ? "movz" : "movs";
+
   if (ty->size == 1)
     println("  mov %%al, (%%edi)");
   else if (ty->size == 2)
     println("  mov %%ax, (%%edi)");
-  else if (ty->size == 4)
+  else // ty->size >= 4, treat as 32-bit for i386
     println("  mov %%eax, (%%edi)");
 }
 
@@ -682,9 +682,9 @@ static void gen_expr(Node *node) {
     return;
   }
   case ND_DEREF:
-    gen_expr(node->lhs);
-    load(node->ty);
-    return;
+      gen_expr(node->lhs);
+      load(node->ty);
+      return;
   case ND_ADDR:
     gen_addr(node->lhs);
     return;
@@ -961,10 +961,15 @@ static void gen_expr(Node *node) {
     dx = "%edx";
   }
 
+  gen_expr(node->rhs);
+  push();
+  gen_expr(node->lhs);
+  pop("%edi");
+
   switch (node->kind) {
   case ND_ADD:
-    println("  add %%edi, %%eax");
-    return;
+      println("  add %%edi, %%eax");
+      return;
   case ND_SUB:
     println("  sub %%edi, %%eax");
     return;
@@ -1221,7 +1226,7 @@ static void emit_data(Obj *prog) {
       int pos = 0;
       while (pos < var->ty->size) {
         if (rel && rel->offset == pos) {
-          println("  .quad %s%+ld", *rel->label, rel->addend);
+          println("  .long %s%+ld", *rel->label, rel->addend);
           rel = rel->next;
           pos += 8;
         } else {
@@ -1307,10 +1312,12 @@ static void gen_start(void) {
     // println("  hlt"); // go fuck yourself
 }
 
-void codegen(Obj *prog, FILE *out) {
+void codegen(Obj *prog, FILE *out, bool library) {
   output_file = out;
 
-  gen_start();
+  if (!library) {
+ 	gen_start();
+  }
 
   File **files = get_input_files();
   for (int i = 0; files[i]; i++)

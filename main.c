@@ -33,6 +33,7 @@ static char *output_file;
 
 static StringArray input_paths;
 static StringArray tmpfiles;
+bool lib = false;
 
 static void usage(int status) {
   fprintf(stderr, "chibicc [ -o <path> ] <file>\n");
@@ -167,6 +168,11 @@ static void parse_args(int argc, char **argv) {
 
     if (!strcmp(argv[i], "-E")) {
       opt_E = true;
+      continue;
+    }
+
+    if (!strcmp(argv[i], "-library")) {
+      lib = true;
       continue;
     }
 
@@ -558,7 +564,7 @@ static void cc1(void) {
   FILE *output_buf = open_memstream(&buf, &buflen);
 
   // Traverse the AST to emit assembly.
-  codegen(prog, output_buf);
+  codegen(prog, output_buf, lib);
   fclose(output_buf);
 
   // Write the asembly text to a file.
@@ -633,10 +639,9 @@ static void run_linker(StringArray *inputs, char *output) {
     strarray_push(&arr, "i686-elf-ld");
     strarray_push(&arr, "-T");
     strarray_push(&arr, ld);
+    // strarray_push(&arr, "lib/libc.o");
     strarray_push(&arr, "-o");
     strarray_push(&arr, output);
-
-    strarray_push(&arr, "lib/libc.o");
 
     for (int i = 0; i < inputs->len; i++)
         strarray_push(&arr, inputs->data[i]);
@@ -678,6 +683,7 @@ int main(int argc, char **argv) {
     error("cannot specify '-o' with '-c,' '-S' or '-E' with multiple files");
 
   StringArray ld_args = {};
+
 
   for (int i = 0; i < input_paths.len; i++) {
     char *input = input_paths.data[i];
@@ -748,10 +754,13 @@ int main(int argc, char **argv) {
     run_cc1(argc, argv, input, tmp1);
     assemble(tmp1, tmp2);
     strarray_push(&ld_args, tmp2);
+    strarray_push(&ld_args, "lib/libc.o");
     continue;
   }
 
   if (ld_args.len > 0)
-    run_linker(&ld_args, opt_o ? opt_o : "a.out");
+    if (!lib) {
+    	run_linker(&ld_args, opt_o ? opt_o : "a.out");
+    }
   return 0;
 }
