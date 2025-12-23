@@ -621,14 +621,14 @@ static char *find_gcc_libpath(void) {
 static void run_linker(StringArray *inputs, char *output) {
     // made my own linker script bc, what do you mean 4 kb just for a program return 1
     const char *linkerscript =
-        "OUTPUT_FORMAT(\"binary\")\n"
-        "SECTIONS {\n"
-        "    . = 0x100000;\n"
-        "    .text : { *(.text) }\n"
-        "    .rodata : { *(.rodata) }\n"
-        "    .data : { *(.data) }\n"
-        "    .bss : { *(.bss) }\n"
-        "}\n";
+            "OUTPUT_FORMAT(\"binary\")\n"
+            "SECTIONS {\n"
+            "    . = 0x100000;\n"
+            "    .text : { *(.text) }\n"
+            "    .rodata : { *(.rodata) }\n"
+            "    .data : { *(.data) }\n"
+            "    /* .bss is excluded to keep binary small */\n"
+            "}\n";
 
     char *ld = create_tmpfile();
     FILE *f = fopen(ld, "w");
@@ -754,7 +754,8 @@ int main(int argc, char **argv) {
     run_cc1(argc, argv, input, tmp1);
     assemble(tmp1, tmp2);
     strarray_push(&ld_args, tmp2);
-    strarray_push(&ld_args, "lib/libc.o");
+    strarray_push(&ld_args, "lib/string.o");
+    strarray_push(&ld_args, "lib/stdio.o");
     continue;
   }
 
