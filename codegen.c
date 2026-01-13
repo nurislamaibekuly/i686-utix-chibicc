@@ -1307,9 +1307,24 @@ static void emit_text(Obj *prog) {
 
 static void gen_start(void) {
     println("  .globl _start");
+    println("  .text");
     println("_start:");
-    println("  call main");
-    // println("  hlt"); // go fuck yourself
+
+    // _start expects the stack prepared by run_bin()
+    // argc at [esp], argv at [esp+4]
+    println("  movl (%%esp), %%eax");         // argc
+    println("  leal 4(%%esp), %%ebx");        // argv
+    println("  push %%eax");                  // push argc
+    println("  push %%ebx");                  // push argv
+    println("  call main");                   // call main(int argc, char **argv)
+    println("  add $8, %%esp");               // clean up stack
+
+    /*
+    println("hang:");
+    println("  cli");
+    println("  hlt");
+    println("  jmp hang");
+    */
 }
 
 void codegen(Obj *prog, FILE *out, bool library) {

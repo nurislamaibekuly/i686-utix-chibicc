@@ -623,7 +623,7 @@ static void run_linker(StringArray *inputs, char *output) {
     const char *linkerscript =
             "OUTPUT_FORMAT(\"binary\")\n"
             "SECTIONS {\n"
-            "    . = 0x100000;\n"
+            "    . = 0x01000000;\n"
             "    .text : { *(.text) }\n"
             "    .rodata : { *(.rodata) }\n"
             "    .data : { *(.data) }\n"
@@ -754,8 +754,7 @@ int main(int argc, char **argv) {
     run_cc1(argc, argv, input, tmp1);
     assemble(tmp1, tmp2);
     strarray_push(&ld_args, tmp2);
-    strarray_push(&ld_args, "lib/string.o");
-    strarray_push(&ld_args, "lib/stdio.o");
+    strarray_push(&ld_args, "lib/libc.o");
     continue;
   }
 

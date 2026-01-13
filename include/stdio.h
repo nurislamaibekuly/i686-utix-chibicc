@@ -1,13 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
-#include <string.h>
-#include <ram.h>
-#include <file.h>
-#define HEAP_START 0x100000
 
-void* malloc(uint32_t size);
-void free(void* ptr);
+void syscallsend(uint8_t type, const char* msg, size_t len);
+size_t syscallread(uint8_t* out, size_t len);
 void printf(const char* fmt, ...);
-void* aligned_malloc(size_t alignment, size_t size);
-FILE* fopen(const char* name, const char *mode);
