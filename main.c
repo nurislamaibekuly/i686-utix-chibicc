@@ -619,16 +619,28 @@ static char *find_gcc_libpath(void) {
 }
 
 static void run_linker(StringArray *inputs, char *output) {
-    // made my own linker script bc, what do you mean 4 kb just for a program return 1
     const char *linkerscript =
-            "OUTPUT_FORMAT(\"binary\")\n"
-            "SECTIONS {\n"
-            "    . = 0x01000000;\n"
-            "    .text : { *(.text) }\n"
-            "    .rodata : { *(.rodata) }\n"
-            "    .data : { *(.data) }\n"
-            "    /* .bss is excluded to keep binary small */\n"
-            "}\n";
+        "OUTPUT_FORMAT(\"binary\")\n"
+        "SECTIONS {\n"
+        "    . = 0x01000000;\n"
+        "    .binhdr : {\n"
+        "        *(.binhdr)\n"
+        "    }\n"
+        "    .text : ALIGN(16) {\n"
+        "        *(.text .text.*)\n"
+        "    }\n"
+        "    .rodata : ALIGN(16) {\n"
+        "        *(.rodata .rodata.*)\n"
+        "    }\n"
+        "    .data : ALIGN(16) {\n"
+        "        *(.data .data.*)\n"
+        "    }\n"
+        "    /DISCARD/ : {\n"
+        "        *(.bss .bss.*)\n"
+        "        *(.comment)\n"
+        "        *(.note*)\n"
+        "    }\n"
+        "}\n";
 
     char *ld = create_tmpfile();
     FILE *f = fopen(ld, "w");
@@ -639,12 +651,15 @@ static void run_linker(StringArray *inputs, char *output) {
     strarray_push(&arr, "i686-elf-ld");
     strarray_push(&arr, "-T");
     strarray_push(&arr, ld);
-    // strarray_push(&arr, "lib/libc.o");
     strarray_push(&arr, "-o");
     strarray_push(&arr, output);
 
     for (int i = 0; i < inputs->len; i++)
         strarray_push(&arr, inputs->data[i]);
+
+    // Add these flags for better debugging
+    strarray_push(&arr, "--no-relax");
+    strarray_push(&arr, "-N");  // Make text section writable (for debugging)
 
     strarray_push(&arr, NULL);
     run_subprocess(arr.data);

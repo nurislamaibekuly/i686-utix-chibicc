@@ -1305,26 +1305,44 @@ static void emit_text(Obj *prog) {
   }
 }
 
+static void gen_bin_header(void) {
+    println("  .section .binhdr,\"a\"");
+    println("  .align 4");
+    println("__start_binhdr:");
+    println("  .long 0x42494E31");       // magic "BIN1"
+    println("  .byte 1");                // arch = i386
+    println("  .byte 1");                // abi
+    println("  .byte 1");                // endian
+    println("  .byte 1");                // version
+    println("  .long _start - __start_binhdr");  // entry OFFSET
+}
+
+// Make sure your _start function has proper prologue
 static void gen_start(void) {
-    println("  .globl _start");
     println("  .text");
+    println("  .globl _start");
+    println("  .type _start, @function");
     println("_start:");
 
-    // _start expects the stack prepared by run_bin()
-    // argc at [esp], argv at [esp+4]
-    println("  movl (%%esp), %%eax");         // argc
-    println("  leal 4(%%esp), %%ebx");        // argv
-    println("  push %%eax");                  // push argc
-    println("  push %%ebx");                  // push argv
-    println("  call main");                   // call main(int argc, char **argv)
-    println("  add $8, %%esp");               // clean up stack
+    // Standard i386 function prologue
+    println("  push %%ebp");
+    println("  mov %%esp, %%ebp");
 
-    /*
-    println("hang:");
-    println("  cli");
-    println("  hlt");
-    println("  jmp hang");
-    */
+    // Get argc and argv from stack
+    // At function entry: [ebp+8]=argc, [ebp+12]=argv
+    println("  mov 8(%%ebp), %%eax");   // argc
+    println("  mov 12(%%ebp), %%ecx");  // argv
+
+    // Call main(argc, argv)
+    println("  push %%ecx");            // argv
+    println("  push %%eax");            // argc
+    println("  call main");
+    println("  add $8, %%esp");         // clean up args
+
+    // Exit with return value
+    println("  mov %%ebp, %%esp");
+    println("  pop %%ebp");
+    println("  ret");
 }
 
 void codegen(Obj *prog, FILE *out, bool library) {
@@ -1332,6 +1350,7 @@ void codegen(Obj *prog, FILE *out, bool library) {
 
   if (!library) {
  	gen_start();
+  	gen_bin_header();
   }
 
   File **files = get_input_files();

@@ -11,6 +11,10 @@ static void graphicsclear() {
     syscallsend(4, (const char*)&dummy, 0);
 }
 
+static void graphicsflush() {
+    syscallsend(7, (const char*)&dummy, 0);
+}
+
 static void graphicsdraw(uint32_t x, uint32_t y, uint32_t color) {
     uint8_t buf[12];
     buf[0] = (x >> 0) & 0xFF;
@@ -34,9 +38,7 @@ static void graphicsdraw(uint32_t x, uint32_t y, uint32_t color) {
 static uint32_t graphicswidth() {
 	if (!fb_width) {
 		syscallsend(5, (const char*)&dummy, 0);
-		if (!syscallread((uint8_t*)&fb_width, sizeof(fb_width))) {
-			syscallread((uint8_t*)&fb_width, sizeof(fb_width));
-		}
+		syscallread((uint8_t*)&fb_width, sizeof(fb_width));
 	}
 
 	return fb_width;
@@ -45,9 +47,7 @@ static uint32_t graphicswidth() {
 static uint32_t graphicsheight() {
 	if (!fb_height) {
 		syscallsend(6, (const char*)&dummy, 0);
-		if (!syscallread((uint8_t*)&fb_height, sizeof(fb_height))) {
-			syscallread((uint8_t*)&fb_height, sizeof(fb_height));
-		}
+		syscallread((uint8_t*)&fb_height, sizeof(fb_height));
 	}
 
 	return fb_height;
